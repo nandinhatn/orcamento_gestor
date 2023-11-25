@@ -1,3 +1,4 @@
+require('dotenv').config();
 const jwt = require("jsonwebtoken");
 const express = require("express")
 const bodyParser= require("body-parser");
@@ -33,23 +34,63 @@ function apiResponse(results){
         "response": results
     })
 }
+app.post('/logout', function(req, res) {
+    res.json({ auth: false, token: null });
+})
 
-app.get('/api/clients', (req,res)=>{
+app.post('/api/login', (req,res,next)=>{
+    let sqlQuery = `SELECT * FROM login WHERE login = '${req.body.login}'`
+    let query = conn.query(sqlQuery, (err, results)=>{
+        if(err){
+            console.log(err)
+        
+            res.json({auth:false});
+            return
+        };
+        console.log(results)
+        if(results.length>0){
+            login = results[0].login
+            password= results[0].password
+        }
+
+        if(req.body.login==login && req.body.password==password){
+            const id = 1;
+            const token = jwt.sign({id}, process.env.SECRET,{
+                expiresIn:50
+            });
+            return res.json({auth:true, token:token})
+        }
+        res.json({auth:false})
+    })
+})
+
+function verifyJWT(req,res,next){
+    const token = req.headers['x-access-token'];
+    if(!token) return res.status(401).json({auth: false, message:" no token provider"});
+
+    jwt.verify(token, process.env.SECRET, function(err,decoded){
+        if(err) return res.status(500).json({auth:false, message:'falied to authenticate token'});
+        req.userId = decoded.id;
+        console.log('aqui', req.userId)
+        next();
+    })
+}
+app.get('/api/clients', verifyJWT, (req,res)=>{
     let sqlQuery = "SELECT * FROM clients";
     let query = conn.query(sqlQuery, (err,results)=>{
-        if(err) throw err;
+        if(err) return res.send(apiResponse({auth:false}));
         res.send(apiResponse(results))
     })
 })
 
- app.get('/api/clients/:id', (req,res)=>{
+ app.get('/api/clients/:id', verifyJWT, (req,res)=>{
     let sqlQuery = "SELECT * FROM clients WHERE id_clients='"+req.params.id+"'";
     let query = conn.query(sqlQuery, (err,results)=>{
         if(err) throw err;
         res.send(apiResponse(results))
     })
 }) 
-app.post('/api/clients', (req,res)=>{
+app.post('/api/clients', verifyJWT, (req,res)=>{
     let data ={
         client_name: req.body.client_name,
         cnpj: req.body.cnpj,
@@ -65,14 +106,14 @@ app.post('/api/clients', (req,res)=>{
     })
 })
 
-app.put('/api/clients/:id', (req,res)=>{
+app.put('/api/clients/:id', verifyJWT,(req,res)=>{
     let sqlQuery = "UPDATE clients SET client_name='"+req.body.client_name+"', cnpj='"+req.body.cnpj+"', address='"+req.body.address+"', email='"+req.body.email+"' WHERE id_clients='"+req.params.id+"'"
     let query = conn.query(sqlQuery, (err,results)=>{
         if(err) throw err;
     res.send(apiResponse(results)) 
    })
 })
-app.delete('/api/clients/:id', (req,res)=>{
+app.delete('/api/clients/:id', verifyJWT, (req,res)=>{
     let sqlQuery = "DELETE FROM clients WHERE id_clients='"+req.params.id+"'";
     let query = conn.query(sqlQuery, (err,results)=>{
         if(err) throw err;
@@ -80,7 +121,7 @@ app.delete('/api/clients/:id', (req,res)=>{
     })
 })
 
-app.post('/api/orcamento', (req,res)=>{
+app.post('/api/orcamento', verifyJWT, (req,res)=>{
     let sqlQuery = "INSERT INTO budget SET ?";
     let data ={
         description: req.body.description,
@@ -94,7 +135,9 @@ app.post('/api/orcamento', (req,res)=>{
         client_id: req.body.client_id,
         date_payment: req.body.date_payment,
         project_name: req.body.project_name,
-        dispute: req.body.dispute
+        dispute: req.body.dispute,
+        date_evento: req.body.date_evento,
+        win: req.body.win
 
 
     }
@@ -104,15 +147,18 @@ app.post('/api/orcamento', (req,res)=>{
     })
 })
 
-app.get('/api/orcamento', (req,res)=>{
+app.get('/api/orcamento', verifyJWT, (req,res)=>{
     let sqlQuery = "SELECT * FROM budget";
     let query = conn.query(sqlQuery, (err,results)=>{
-        if(err) throw err;
+        if(err){
+            console.log('aqui')
+            res.send({auth:false})
+        } 
         res.send(apiResponse(results))
     })
 })
 
-app.get('/api/orcamento/:id', (req,res)=>{
+app.get('/api/orcamento/:id', verifyJWT, (req,res)=>{
     let sqlQuery = "SELECT * FROM budget WHERE id_job='"+req.params.id+"'";
     let query = conn.query(sqlQuery, (err,results)=>{
         if(err) throw err;
@@ -120,7 +166,7 @@ app.get('/api/orcamento/:id', (req,res)=>{
     })
 })
 
-app.put('/api/orcamento/:id', (req,res)=>{
+app.put('/api/orcamento/:id', verifyJWT,(req,res)=>{
     let data ={
         description: req.body.description,
         integral_value : req.body.integral_value,
@@ -145,7 +191,7 @@ app.put('/api/orcamento/:id', (req,res)=>{
     
 })
 
-app.delete('/api/orcamento/:id', (req,res)=>{
+app.delete('/api/orcamento/:id', verifyJWT, (req,res)=>{
     let sqlQuery= "DELETE FROM budget WHERE id_job='"+req.params.id+"'";
     let query = conn.query(sqlQuery,(err,results)=>{
         if (err) throw err;
