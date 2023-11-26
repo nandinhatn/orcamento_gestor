@@ -44,21 +44,21 @@ app.post('/api/login', (req,res,next)=>{
         if(err){
             console.log(err)
         
-            res.json({auth:false});
-            return
+           res.send({auth:false});
+            
         };
         console.log(results)
-        if(results.length>0){
+        if( results &&results.length>0){
             login = results[0].login
             password= results[0].password
         }
 
-        if(req.body.login==login && req.body.password==password){
+        if( req && req.body.login==login && req.body.password==password){
             const id = 1;
             const token = jwt.sign({id}, process.env.SECRET,{
                 expiresIn:50
             });
-            return res.json({auth:true, token:token})
+            return res.send({auth:true, token:token, results: results})
         }
         res.json({auth:false})
     })
