@@ -9,8 +9,14 @@ const http = require('http');
 const https = require('https')
 const cors = require('cors')
 const credential = require('./credentials/credentials.js');
+/* const credentialSSL = require('./credentials/credentialSSL.js'); */
 const app = express();
 const httpServer = http.createServer(app)
+
+const credentials = require('./credentials/credentialSSL.js')
+
+
+const httpsServer = https.createServer(credentials,app)
 app.use(bodyParser.json());
 
 app.use(cors({origin:'*'}));
@@ -56,11 +62,14 @@ app.post('/api/login', (req,res,next)=>{
         if( req && req.body.login==login && req.body.password==password){
             const id = 1;
             const token = jwt.sign({id}, process.env.SECRET,{
-                expiresIn:50
+                expiresIn:20000
             });
-            return res.send({auth:true, token:token, results: results})
+             res.json({auth:true, token:token, results: results})
+             return
+        }else{
+
+            res.json({auth:false})
         }
-        res.json({auth:false})
     })
 })
 
@@ -199,6 +208,6 @@ app.delete('/api/orcamento/:id', verifyJWT, (req,res)=>{
     })
 })
 
-httpServer.listen(8000, ()=>{
+httpsServer.listen(21227, ()=>{
     console.log('server initiadted succesfully')
 })
